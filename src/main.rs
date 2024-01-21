@@ -1,35 +1,41 @@
 //use osmpbf::{ElementReader, Element};
-use geo::{coord, Coord, LineString, Point, GeodesicDistance};
+use geo::{coord, Coord, GeodesicDistance, LineString, Point};
 use osmpbf::*;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-struct Highway {
+struct OSMWay {
     id: i64,
     refs: Vec<i64>,
     tags: HashMap<String, String>,
-    geom: Option<LineString>,
 }
 
 #[derive(Clone, Debug)]
-struct Dependencies {
+struct OSMNode {
+    id: i64,
+    lat: f64,
+    lon: f64,
+}
+
+#[derive(Clone, Debug)]
+struct Node {
+    osm_id: i64,
     lat: f64,
     lon: f64,
 }
 
 #[derive(Debug)]
 struct Edge {
-    id: usize,
     osm_id: i64,
-    geom: LineString,
+    nodes: Vec<Node>,
     weight: f64,
 }
 
-fn open_osmpbf(area: &str) -> Vec<Edge> {
+fn open_osmpbf(area: &str) -> (Vec<OSMWay>, HashMap<i64, OSMNode>) {
     let filepath = format!("{}-latest.osm.pbf", area);
     let mut reader = IndexedReader::from_path(filepath).expect("Error opening file");
-    let mut ways: Vec<Highway> = Vec::new();
-    let mut deps: HashMap<i64, Dependencies> = HashMap::new();
+    let mut ways = Vec::<OSMWay>::new();
+    let mut nodes = HashMap::<i64, OSMNode>::new();
 
     reader
         .read_ways_and_deps(
@@ -42,29 +48,30 @@ fn open_osmpbf(area: &str) -> Vec<Edge> {
                         for r in w.refs() {
                             refs.push(r)
                         }
-                        for t in w.tags() {
-                            tags.insert(t.0.to_owned(), t.1.to_owned());
+                        for (key, value) in w.tags() {
+                            tags.insert(key.to_owned(), value.to_owned());
                         }
-                        ways.push(Highway {
+                        ways.push(OSMWay {
                             id: w.id(),
                             refs,
                             tags,
-                            geom: None,
                         });
                     }
                     Element::Node(n) => {
-                        deps.insert(
+                        nodes.insert(
                             n.id(),
-                            Dependencies {
+                            OSMNode {
+                                id: n.id(),
                                 lat: n.lat(),
                                 lon: n.lon(),
                             },
                         );
                     }
                     Element::DenseNode(dn) => {
-                        deps.insert(
+                        nodes.insert(
                             dn.id(),
-                            Dependencies {
+                            OSMNode {
+                                id: dn.id(),
                                 lat: dn.lat(),
                                 lon: dn.lon(),
                             },
@@ -76,75 +83,64 @@ fn open_osmpbf(area: &str) -> Vec<Edge> {
         )
         .expect("Error reading file");
 
-    let mut edges: Vec<Edge> = Vec::new();
-    for way in ways.iter_mut() {
-        let mut nodes: Vec<Dependencies> = Vec::new();
+    (ways, nodes)
+}
+
+fn process(osm_ways: Vec<OSMWay>, osm_nodes: HashMap<i64, OSMNode>) -> HashMap<i64, Edge> {
+
+    let mut routing_edges = HashMap::<i64, Edge>::new();
+    let mut id = 1;
+    for osm_way in osm_ways.iter() {
+        if osm_way.id == 966521787 {
+            println!("{:?}", osm_way);
+            println!("");
+        }
         let mut contains = 0;
-        let mut temp_geom: Vec<Coord> = Vec::new();
-        // imagine it has 3 items
-        for (id, r) in way.refs.iter().enumerate() {
-            // First: contains = 0
-            // Second: contains = 1
-            // Third: contains = 1
+        let mut routing_nodes = Vec::<Node>::new();
+        let mut previous_node: Option<OSMNode> = None;
+        let mut geom: Vec<Point> = Vec::new();
+        for r in osm_way.refs.iter() {
             if contains == 0 {
-                // First: pushes 1+0 node
-                nodes.push(deps.get(r).expect("Error finding node").to_owned());
+                previous_node = Some(osm_nodes.get(&r).expect("Error finding node").to_owned());
                 contains += 1;
             } else if contains == 1 {
-                // Second: pushes 1+1 node
-                // Third: pushes 1+1 (previously 0+1 which became 1+0)
-                nodes.push(deps.get(r).expect("Error finding node").to_owned());
-                // Second: creates the ls
-                // Third: creates the ls
-                for node in nodes.iter() {
-                    temp_geom.push(coord! {x: node.lat, y: node.lon})
+                if previous_node.is_some() {
+                    let pn = previous_node.clone().unwrap();
+                    let cn = osm_nodes.get(&r).expect("Error finding node").to_owned();
+                    let n1 = Node{osm_id: pn.id, lat: pn.lat, lon: pn.lon};
+                    let n2 = Node{osm_id: cn.id, lat: cn.lat, lon: cn.lon};
+                    let p1:Point = coord! {x: pn.lat, y: pn.lon}.into();
+                    let p2:Point = coord! {x: cn.lat, y: cn.lon}.into();
+                    let weight = p1.geodesic_distance(&p2);
+                    routing_edges.insert(
+                        id,
+                        Edge {
+                            osm_id: osm_way.id,
+                            nodes: vec![n1,n2],
+                            weight,
+                        },
+                    );
+                    routing_nodes.clear();
+                    geom.clear();
+                    id += 1;
+                    contains = 1;
+                    previous_node = Some(osm_nodes.get(&r).expect("Error finding node").to_owned());
                 }
-                let p1: Point = temp_geom
-                    .first()
-                    .expect("Error getting geom element")
-                    .to_owned()
-                    .into();
-                let p2: Point = temp_geom
-                    .last()
-                    .expect("Error getting geom element")
-                    .to_owned()
-                    .into();
-                edges.push(Edge {
-                    id,
-                    osm_id: way.id,
-                    geom: LineString::new(temp_geom.to_owned()),
-                    weight: p1.geodesic_distance(&p2),
-                });
-                // Second: removes node so it's again 0+1 which gets pushed to 1+0 and contains 1.
-                // Third: removes node so it's again 0+1
-                nodes.remove(0);
-                temp_geom.clear();
-                contains = 1;
             } else {
             }
         }
-        break
     }
-
-    edges
-
+    routing_edges
 }
 
 fn main() {
-    let edges = open_osmpbf("melilla");
-    for edge in edges.iter() {
-        println!("{:?}", edge);
-        println!("")
+    let (ways, nodes) = open_osmpbf("melilla");
+    let edges = process(ways, nodes);
+    for (id, edge) in edges.iter() {
+        if edge.osm_id == 966521787 {
+            println!("{}", id);
+            println!("{:?}", edge);
+            println!("")
+        }
     }
 }
-
-//if w.id() == 966521787 {
-//    let refs = w.refs();
-//    for r in refs.into_iter() {
-//        println!("{:?}", r)
-//    }
-//    println!("{:?} - {:?}", w.id(), w.refs());
-//    1
-//} else {
-//    1
-//}
