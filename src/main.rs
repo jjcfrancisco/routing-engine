@@ -89,8 +89,8 @@ fn open_osmpbf(area: &str) -> (Vec<OSMWay>, HashMap<i64, OSMNode>) {
 fn process(osm_ways: Vec<OSMWay>, osm_nodes: HashMap<i64, OSMNode>) -> HashMap<i64, Edge> {
 
     let mut routing_edges = HashMap::<i64, Edge>::new();
-    let mut id = 1;
-    for osm_way in osm_ways.iter() {
+    for (id, osm_way) in osm_ways.iter().enumerate() {
+        let id = id as i64;
         if osm_way.id == 966521787 {
             println!("{:?}", osm_way);
             println!("");
@@ -122,7 +122,6 @@ fn process(osm_ways: Vec<OSMWay>, osm_nodes: HashMap<i64, OSMNode>) -> HashMap<i
                     );
                     routing_nodes.clear();
                     geom.clear();
-                    id += 1;
                     contains = 1;
                     previous_node = Some(osm_nodes.get(&r).expect("Error finding node").to_owned());
                 }
@@ -137,10 +136,11 @@ fn main() {
     let (ways, nodes) = open_osmpbf("melilla");
     let edges = process(ways, nodes);
     for (id, edge) in edges.iter() {
-        if edge.osm_id == 966521787 {
-            println!("{}", id);
-            println!("{:?}", edge);
-            println!("")
-        }
+        println!("{:?}, {:?}", id, edge)
+        //if edge.osm_id == 966521787 {
+        //    println!("{}", id);
+        //    println!("{:?}", edge);
+        //    println!("")
+        //}
     }
 }
