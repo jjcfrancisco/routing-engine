@@ -1,7 +1,6 @@
 use geo::{coord, GeodesicDistance, Point};
 use rusqlite::Connection;
 use std::collections::HashMap;
-use crate::TEST_ID;
 
 #[derive(Debug)]
 pub struct Node {

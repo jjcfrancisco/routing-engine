@@ -1,6 +1,3 @@
-//use geo::{coord, GeodesicDistance, Point};
-//use osmpbf::{Element, IndexedReader};
-//use rusqlite::{Connection, Result};
 use std::collections::HashMap;
 mod io;
 mod network;
