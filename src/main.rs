@@ -2,14 +2,14 @@ use std::collections::HashMap;
 mod io;
 mod network;
 
-// For testing purposes
-const TEST_ID: i64 = 966590652;
-
 fn main() {
-    let (ways, nodes) = io::open_osmpbf("melilla"); //wales
-    let network = network::process(ways, nodes);
+    let network = network::create("melilla-latest.osm.pbf");
     network::save(network);
+    // let result = network::load("routing.db");
 }
+
+// Tests
+const TEST_ID: i64 = 966590652;
 
 fn test(network: HashMap<i64, network::Edge>) {
     // Test

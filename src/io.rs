@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use osmpbf::{Element, IndexedReader};
 use crate::network::{OSMNode, OSMWay};
 
-pub fn open_osmpbf(area: &str) -> (Vec<OSMWay>, HashMap<i64, OSMNode>) {
-    let filepath = format!("{}-latest.osm.pbf", area);
-    let mut reader = IndexedReader::from_path(filepath).expect("Error opening file");
+pub fn open_osmpbf(pbf_file: &str) -> (Vec<OSMWay>, HashMap<i64, OSMNode>) {
+    let mut reader = IndexedReader::from_path(pbf_file).expect("Error opening file");
     let mut ways = Vec::<OSMWay>::new();
     let mut nodes = HashMap::<i64, OSMNode>::new();
 
