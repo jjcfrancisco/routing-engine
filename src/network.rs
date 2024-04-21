@@ -3,6 +3,7 @@ use rusqlite::Connection;
 use std::collections::HashMap;
 //use std::io::{self, Read};
 use crate::io::open_osmpbf;
+use crate::utils::RoutyResult;
 
 #[derive(Debug)]
 pub struct Node {
@@ -45,7 +46,7 @@ pub struct Network {
     pub weight: f64,
 }
 
-pub fn create(pbf_file: &str) -> HashMap<i64, Edge> {
+pub fn create(pbf_file: &str) -> RoutyResult<HashMap<i64, Edge>> {
     let (osm_ways, osm_nodes) = open_osmpbf(pbf_file);
     let mut routing_edges = HashMap::<i64, Edge>::new();
     let mut id = 1;
@@ -95,7 +96,7 @@ pub fn create(pbf_file: &str) -> HashMap<i64, Edge> {
             }
         }
     }
-    routing_edges
+    Ok(routing_edges)
 }
 
 pub fn save(network: HashMap<i64, Edge>) {

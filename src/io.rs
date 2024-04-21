@@ -56,3 +56,12 @@ pub fn open_osmpbf(pbf_file: &str) -> (Vec<OSMWay>, HashMap<i64, OSMNode>) {
     (ways, nodes)
 }
 
+// mod tests {
+//     use crate::io::open_osmpbf;
+//
+//     #[test]
+//     fn test_open_osmpbf() {
+//         let result = open_osmpbf("../tests/fixtures/example.osm.pbf");
+//         assert_eq!(result, 4);
+//     }
+// }

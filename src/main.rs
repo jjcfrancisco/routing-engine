@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 mod io;
+mod utils;
 mod network;
 
 fn main() {
     let network = network::create("melilla-latest.osm.pbf");
-    network::save(network);
+    network::save(network.expect("Error creating a routing network"));
     // let result = network::load("routing.db");
 }
 
