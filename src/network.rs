@@ -4,6 +4,7 @@ use std::collections::HashMap;
 //use std::io::{self, Read};
 use crate::io::open_osmpbf;
 use crate::utils::RoutyResult;
+use crate::utils::RoutyError::SaveNetworkError;
 
 #[derive(Debug)]
 pub struct Node {
@@ -99,9 +100,11 @@ pub fn create(pbf_file: &str) -> RoutyResult<HashMap<i64, Edge>> {
     Ok(routing_edges)
 }
 
-pub fn save(network: HashMap<i64, Edge>) {
+pub fn save(network: HashMap<i64, Edge>) -> RoutyResult<String> {
     // get current working dir
-    let conn = Connection::open("./routing.db").expect("Error opening db");
+    let conn = Connection::open("./routing.db")
+        .map_err(|err| SaveNetworkError(format!("{}", err)))?;
+
     conn.execute(
         "CREATE TABLE routing (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,12 +118,11 @@ pub fn save(network: HashMap<i64, Edge>) {
             weight INTEGER
         )",
         (),
-    )
-    .expect("Error creating table");
+    ).map_err(|err| SaveNetworkError(format!("{}", err)))?;
 
     for (_, edge) in network.iter() {
-        let n1 = edge.nodes.first().expect("Error getting node one");
-        let n2 = edge.nodes.last().expect("Error getting node two");
+        let n1 = edge.nodes.first().ok_or(SaveNetworkError("Error getting node 1".to_string()))?;
+        let n2 = edge.nodes.last().ok_or(SaveNetworkError("Error getting node 2".to_string()))?;
         conn.execute(
             "INSERT INTO routing (way_id, node1_id, node1_lat, node1_lon, node2_id, node2_lat, node2_lon, weight) \
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -128,8 +130,9 @@ pub fn save(network: HashMap<i64, Edge>) {
              &n1.lat, &n1.lon,
              &n2.osm_id, &n2.lat,
              &n2.lon, &edge.weight),
-        ).expect("Error inserting data");
-    }
+        ).map_err(|err| SaveNetworkError(format!("{}", err)))?;
+    };
+    Ok("Network Saved.".to_string())
 }
 
 pub fn load(network_name: &str) -> Result<Vec<Network>, rusqlite::Error> {
